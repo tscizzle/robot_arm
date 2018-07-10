@@ -3,7 +3,7 @@ from datetime import datetime
 from dateutil.parser import parse as dateParse
 import pytz
 from threading import Thread
-from flask import Flask, request, render_template
+from flask import Flask, request, render_template, jsonify
 from motor import setup, done, moveArmTo
 setup()
 
@@ -40,6 +40,13 @@ def keyevent():
             state['controller']['pressedKeys'] = allowedPressedKeys
             state['controller']['lastRequest'] = requestTimeStr
     return ''
+
+@app.route('/getState')
+def getState():
+    return jsonify({
+        'state': state,
+        'timestamp': datetime.now(pytz.utc).isoformat()
+    })
 
 # a loop constantly checks the current state and acts accordingly
 
@@ -84,5 +91,5 @@ if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', use_reloader=False)
     state['done'] = True
     controllerThread.join()
-    
-    
+
+

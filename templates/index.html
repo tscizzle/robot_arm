@@ -1,37 +1,99 @@
 <html>
-<body>
-<h1>Press keys to send to me</h1>
-<script type="text/javascript">
-window.pressedKeys = {};
-window.lastKeysSent = {};
-const getUpdateFunc = ({ remove }) => {
-	const handler = event => {
-		const pressedKeys = window.pressedKeys;
-		const lastKeysSent = window.lastKeysSent;
-		event = event || window.event;
-		const keyCode = event.keyCode;
-		if (remove) {
-			delete pressedKeys[keyCode];
-		} else {
-			pressedKeys[keyCode] = true;
-		}
-		const requestTime = new Date().toISOString();
-		const body = { pressedKeys, requestTime };
-		window.lastKeysSent = Object.assign(
-			{}, body.pressedKeys
-		)
-		fetch('/keyevent', {
-			method: 'POST',
-			body: JSON.stringify(body),
-			headers: {
-				'Content-Type': 'application/json',
-			},
-		});
-	};
-	return handler;
-};
-document.onkeydown = getUpdateFunc({ remove: false });
-document.onkeyup = getUpdateFunc({ remove: true });
-</script>
-</body>
+  <body>
+    <h1>Press keys to send to me</h1>
+
+    <div id="area">
+      <div id="cursor">
+        <div id="coordinates"></div>
+      </div>
+    </div>
+
+    <style>
+      #area {
+        height: 500px;
+        width: 500px;
+        background-color: #DDD;
+        position: relative;
+      }
+
+      #cursor {
+        height: 10px;
+        width: 10px;
+        background-color: red;
+        position: absolute;
+      }
+
+      #coordinates {
+        position: absolute;
+        top: -2em;
+        white-space: nowrap;
+      }
+    </style>
+
+    <script type="text/javascript">
+      window.pressedKeys = {};
+      window.lastKeysSent = {};
+      window.keypressAt = new Date();
+      const getSendUpdateFunc = ({ remove }) => {
+        const handler = event => {
+          window.keypressAt = Date.now();
+          const pressedKeys = window.pressedKeys;
+          const lastKeysSent = window.lastKeysSent;
+          event = event || window.event;
+          const keyCode = event.keyCode;
+          if (remove) {
+            delete pressedKeys[keyCode];
+          } else {
+            pressedKeys[keyCode] = true;
+          }
+          const requestTime = new Date().toISOString();
+          const body = { pressedKeys, requestTime };
+          window.lastKeysSent = Object.assign(
+            {}, body.pressedKeys
+          )
+          fetch('/keyevent', {
+            method: 'POST',
+            body: JSON.stringify(body),
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+        };
+        return handler;
+      };
+      document.onkeydown = getSendUpdateFunc({ remove: false });
+      document.onkeyup = getSendUpdateFunc({ remove: true });
+
+      window.serverState = {
+        currentCoordinates: [0, 0],
+        updatedAt: new Date(2017, 1, 1),
+      };
+      setInterval(() => {
+        const secondsAgo3 = new Date();
+        secondsAgo3.setSeconds(secondsAgo3.getSeconds() - 3);
+        if (window.keypressAt > secondsAgo3) {
+          fetch('/getState')
+            .then(jsonRes => jsonRes.json())
+            .then(({ state, timestamp }) => {
+              const serverUpdateTime = Date.parse(timestamp);
+              if (serverUpdateTime > window.serverState.updatedAt) {
+                window.serverState = {
+                  currentCoordinates: state.currentCoordinates,
+                  updatedAt: serverUpdateTime,
+                };
+                updateDisplay();
+              }
+            });
+        }
+      }, 100);
+
+      const updateDisplay = () => {
+        const x = window.serverState.currentCoordinates[0].toFixed(2);
+        const y = window.serverState.currentCoordinates[1].toFixed(2);
+        document.getElementById('cursor').style.left = 250 + (x * 100);
+        document.getElementById('cursor').style.bottom = 250 + (y * 100);
+        document.getElementById('coordinates').innerHTML = '(' + x + ', ' + y + ')';
+      };
+    </script>
+  </body>
 </html>
